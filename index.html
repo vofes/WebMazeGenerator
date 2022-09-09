@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Генератор лабиринтов</title>
+        <meta name="description" content="Генерируем лабиринты">
+        <style>
+/* Stylesheet */
+html
+{
+    background-color: rgb(34, 34, 34);
+    height: 100%;
+    font-family: arial;
+    color: white;
+    font-size: 2em;
+    font-weight: 600;
+}
+
+body
+{
+    margin: 0px;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas
+{
+    width: 720px;
+    height: 720px;
+    background-color: rgb(35, 35, 35);
+    margin-bottom: 35px;
+}
+
+button
+{
+    color: white;
+    font-size: 85px;
+    background: none;
+    border: 0px;
+    cursor: pointer;
+}
+
+label
+{
+    margin-left: 45px;
+    margin-bottom: 20px;
+}
+
+input
+{
+    background: none;
+    border-bottom: 1px;
+    border-top: 0px;
+    border-left: 0px;
+    border-right: 0px;
+    border-style: solid;
+    border-color: white;
+    color: white;
+    font-size: 1em;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+        </style>
+    </head>
+    <body>
+        <!-- HTML -->
+        <label>Размер (только нечётные числа):<input type="number" id="inputScale" max="99" min="3" value="15"></input></label>
+        <canvas id="canvas"></canvas>
+        <button id="refreshButton">🗘</button>
+        <script>
+// Script
+class Vector {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    Add(other) {
+        return new Vector(this.x + other.x, this.y + other.y);
+    }
+    Equal(other) {
+        return other.x == this.x && other.y == this.y;
+    }
+}
+class Stack {
+    constructor() {
+        this.items = [];
+    }
+    add(element) {
+        return this.items.push(element);
+    }
+    remove() {
+        if (this.items.length > 0)
+            return this.items.pop();
+    }
+    peek() {
+        return this.items[this.items.length - 1];
+    }
+    isEmpty() {
+        return this.items.length == 0;
+    }
+    get size() {
+        return this.items.length;
+    }
+}
+class Maze {
+    constructor(gridScale) {
+        this.output = new Array();
+        this.path = new Stack();
+        this.visited = [];
+        this.sides = [
+            new Vector(1, 0),
+            new Vector(-1, 0),
+            new Vector(0, 1),
+            new Vector(0, -1)
+        ];
+        this.GenerateMaze(gridScale);
+    }
+    GenerateMaze(gridScale) {
+        this.output = new Array(gridScale.x);
+        for (let x = 0; x < gridScale.x; x++)
+            this.output[x] = new Array(gridScale.y);
+        for (let x = 0; x < gridScale.x; x++)
+            for (let y = 0; y < gridScale.y; y++)
+                this.output[x][y] = false;
+        this.path = new Stack();
+        this.path.add(new Vector(0, 0));
+        this.visited = new Array();
+        while (this.path.size > 0) {
+            this.RecursiveBacktrackerAlgorithm();
+            this.path.remove();
+        }
+    }
+    RecursiveBacktrackerAlgorithm() {
+        Maze.ShuffleArray(this.sides);
+        for (let i = 0; i < this.sides.length; i++) {
+            let side = this.path.peek().Add(this.sides[i]);
+            if (side.x < 0 || side.x >= this.output.length / 2)
+                continue;
+            if (side.y < 0 || side.y >= this.output[0].length / 2)
+                continue;
+            if (this.visited.findIndex(cell => cell.Equal(side)) !== -1)
+                continue;
+            this.output[side.x * 2][side.y * 2] = true;
+            let betweenPos = new Vector(this.path.peek().x + side.x, this.path.peek().y + side.y);
+            this.output[betweenPos.x][betweenPos.y] = true;
+            this.visited.push(side);
+            this.path.add(side);
+            this.RecursiveBacktrackerAlgorithm();
+        }
+        return;
+    }
+    static ShuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+}
+const canvas = document.getElementById("canvas");
+canvas.width = canvas.clientWidth;
+canvas.height = canvas.clientHeight;
+const ctx = canvas.getContext('2d');
+function FloorToOdd(n) {
+    return 2 * Math.floor(n / 2) + 1;
+}
+function RenderMaze(mazeOutput) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const fieldScale = new Vector(FloorToOdd(mazeOutput.length + 2), FloorToOdd(mazeOutput[0].length + 2));
+    const borderWidth = 2;
+    const cellScale = new Vector(canvas.width / fieldScale.x - borderWidth, canvas.height / fieldScale.y - borderWidth);
+    for (let x = 0; x < fieldScale.x; x++) {
+        for (let y = 0; y < fieldScale.y; y++) {
+            let color = "black";
+            if (x !== 0 && x !== fieldScale.x - 1 && y !== 0 && y !== fieldScale.y - 1)
+                color = mazeOutput[x - 1][y - 1] === true ? "white" : "black";
+            let position = new Vector(x * (cellScale.x + borderWidth) + borderWidth / 2.0, y * (cellScale.y + borderWidth) + borderWidth / 2.0);
+            ctx.fillStyle = color;
+            ctx.fillRect(position.x, canvas.height - position.y - cellScale.y, cellScale.x, cellScale.y);
+        }
+    }
+}
+
+function main() {
+    let inputScale = document.getElementById("inputScale");
+    RenderMaze(new Maze(new Vector(inputScale.value, inputScale.value)).output);
+}
+main();
+const refreshButton = document.getElementById("refreshButton");
+refreshButton.addEventListener("click", main);
+ 
+        </script>
+    </body>
+</html>
